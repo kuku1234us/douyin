@@ -32,8 +32,8 @@ poetry run python run.py
 ### Working Directory (UNC recommended)
 
 - Set your working directory in Preferences to a UNC path to avoid drive-letter changes, e.g.:
-  - \\jimmymovie\Sg16TB\DouyinDirectory\
-- The app normalizes mapped drives (like `V:\`) to UNC on startup and when saving preferences.
+  - `\\\\server\\share\\WorkingDirectory\\`
+- The app normalizes mapped drives (like `X:`) to UNC on startup and when saving preferences.
 
 Directory layout created under working directory:
 
