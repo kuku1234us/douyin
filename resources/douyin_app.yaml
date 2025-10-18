@@ -1,0 +1,33 @@
+app:
+  title: "Douyin Framework"
+  icon: "fa5s.rocket"
+  window:
+    width: 1000
+    height: 700
+    min_width: 700
+    min_height: 500
+
+logging:
+  level: "INFO"
+  log_to_file: false
+  log_to_console: true
+  clear_on_startup: false
+
+sidebar:
+  title: "Menu"
+  icon: "fa5s.bars"
+  sections:
+    - title: "Main"
+      items:
+        - id: "home"
+          title: "Home"
+          icon: "fa5s.home"
+          page: "DashboardPage"
+        - id: "channels"
+          title: "Channels"
+          icon: "fa5s.users"
+          page: "ChannelsPage"
+        - id: "preferences"
+          title: "Preferences"
+          icon: "fa5s.cog"
+          page: "PreferencesPage"
