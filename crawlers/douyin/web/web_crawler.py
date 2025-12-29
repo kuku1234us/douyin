@@ -69,15 +69,54 @@ with open(f"{path}/config.yaml", "r", encoding="utf-8") as f:
 
 class DouyinWebCrawler:
 
+    @staticmethod
+    def _get_cookie_kv(cookie: str, key: str) -> str:
+        try:
+            if not cookie:
+                return ""
+            parts = [p.strip() for p in cookie.split(";") if p.strip()]
+            for p in parts:
+                if p.startswith(key + "="):
+                    return p.split("=", 1)[1].strip()
+        except Exception:
+            pass
+        return ""
+
+    @staticmethod
+    def _set_cookie_kv(cookie: str, key: str, value: str) -> str:
+        try:
+            parts = [p.strip() for p in (cookie or "").split(";") if p.strip()]
+            out = []
+            found = False
+            for p in parts:
+                if p.startswith(key + "="):
+                    out.append(f"{key}={value}")
+                    found = True
+                else:
+                    out.append(p)
+            if not found:
+                out.append(f"{key}={value}")
+            return "; ".join(out)
+        except Exception:
+            return cookie or ""
+
     # 从配置文件中获取抖音的请求头
     async def get_douyin_headers(self):
         douyin_config = config["TokenManager"]["douyin"]
+        cookie = douyin_config["headers"]["Cookie"]
+        # Ensure msToken exists in Cookie; missing msToken often results in HTTP 200 empty body (anti-bot)
+        if "msToken=" not in (cookie or ""):
+            try:
+                ms = TokenManager.gen_real_msToken()
+                cookie = self._set_cookie_kv(cookie, "msToken", ms)
+            except Exception:
+                pass
         kwargs = {
             "headers": {
                 "Accept-Language": douyin_config["headers"]["Accept-Language"],
                 "User-Agent": douyin_config["headers"]["User-Agent"],
                 "Referer": douyin_config["headers"]["Referer"],
-                "Cookie": douyin_config["headers"]["Cookie"],
+                "Cookie": cookie,
             },
             "proxies": {"http://": douyin_config["proxies"]["http"], "https://": douyin_config["proxies"]["https"]},
         }
@@ -102,7 +141,9 @@ class DouyinWebCrawler:
 
             # 生成一个作品详情的带有a_bogus加密参数的Endpoint
             params_dict = params.dict()
-            params_dict["msToken"] = ''
+            # msToken must be non-empty; empty msToken often yields HTTP 200 with empty body (anti-bot)
+            ms_cookie = self._get_cookie_kv(kwargs["headers"].get("Cookie", ""), "msToken")
+            params_dict["msToken"] = ms_cookie or TokenManager.gen_real_msToken()
             a_bogus = BogusManager.ab_model_2_endpoint(params_dict, kwargs["headers"]["User-Agent"])
             endpoint = f"{DouyinAPIEndpoints.POST_DETAIL}?{urlencode(params_dict)}&a_bogus={a_bogus}"
 
@@ -122,7 +163,9 @@ class DouyinWebCrawler:
 
             # 生成一个用户发布作品数据的带有a_bogus加密参数的Endpoint
             params_dict = params.dict()
-            params_dict["msToken"] = ''
+            # msToken must be non-empty; empty msToken often yields HTTP 200 with empty body (anti-bot)
+            ms_cookie = self._get_cookie_kv(kwargs["headers"].get("Cookie", ""), "msToken")
+            params_dict["msToken"] = ms_cookie or TokenManager.gen_real_msToken()
             a_bogus = BogusManager.ab_model_2_endpoint(params_dict, kwargs["headers"]["User-Agent"])
             endpoint = f"{DouyinAPIEndpoints.USER_POST}?{urlencode(params_dict)}&a_bogus={a_bogus}"
 
@@ -141,7 +184,9 @@ class DouyinWebCrawler:
             # response = await crawler.fetch_get_json(endpoint)
 
             params_dict = params.dict()
-            params_dict["msToken"] = ''
+            # msToken must be non-empty; empty msToken often yields HTTP 200 with empty body (anti-bot)
+            ms_cookie = self._get_cookie_kv(kwargs["headers"].get("Cookie", ""), "msToken")
+            params_dict["msToken"] = ms_cookie or TokenManager.gen_real_msToken()
             a_bogus = BogusManager.ab_model_2_endpoint(params_dict, kwargs["headers"]["User-Agent"])
             endpoint = f"{DouyinAPIEndpoints.USER_FAVORITE_A}?{urlencode(params_dict)}&a_bogus={a_bogus}"
 

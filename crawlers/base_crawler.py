@@ -181,6 +181,7 @@ class BaseCrawler:
         Returns:
             response: 响应内容 (Response content)
         """
+        last_error: Exception | None = None
         for attempt in range(self._max_retries):
             try:
                 response = await self.aclient.get(url, follow_redirects=True)
@@ -212,7 +213,18 @@ class BaseCrawler:
                 self.handle_http_status_error(http_error, url, attempt + 1)
 
             except APIError as e:
+                # NOTE: the previous behavior swallowed the exception and fell out of the loop,
+                # returning None and causing confusing downstream "NoneType" errors.
+                last_error = e
                 e.display_error()
+                if attempt == self._max_retries - 1:
+                    raise
+                await asyncio.sleep(self._timeout)
+                continue
+
+        if last_error:
+            raise last_error
+        raise APIRetryExhaustedError("获取端点数据失败, 次数达到上限")
 
     async def post_fetch_data(self, url: str, params: dict = {}, data=None):
         """
@@ -225,6 +237,7 @@ class BaseCrawler:
         Returns:
             response: 响应内容 (Response content)
         """
+        last_error: Exception | None = None
         for attempt in range(self._max_retries):
             try:
                 response = await self.aclient.post(
@@ -262,7 +275,17 @@ class BaseCrawler:
                 self.handle_http_status_error(http_error, url, attempt + 1)
 
             except APIError as e:
+                # NOTE: swallow → None return caused confusing downstream errors; re-raise or retry.
+                last_error = e
                 e.display_error()
+                if attempt == self._max_retries - 1:
+                    raise
+                await asyncio.sleep(self._timeout)
+                continue
+
+        if last_error:
+            raise last_error
+        raise APIRetryExhaustedError("获取端点数据失败, 次数达到上限")
 
     async def head_fetch_data(self, url: str):
         """

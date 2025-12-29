@@ -344,13 +344,11 @@ class BaseTableView(QTableView):
                 border: 1px solid {self.theme.get_color('border', 'primary')};
                 border-radius: 4px;
                 selection-background-color: {self.theme.get_color('background', 'selected_row')};
-                selection-color: {self.theme.get_color('text', 'selected_row')};
                 gridline-color: transparent;
             }}
              QTableView::item {{
                  padding: 0px 8px;
                  border: none;
-                 color: {self.theme.get_color('text', 'primary')};
                  background-color: transparent;
              }}
              QTableView::item:selected {{
