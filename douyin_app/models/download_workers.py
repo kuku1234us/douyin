@@ -39,25 +39,26 @@ async def list_user_posts(
     max_cursor = 0
     has_more = True
     results: List[Tuple[str, int, int, int, Optional[str]]] = []
+    # Prefer Firefox (logged-in session) to avoid partial/empty results from
+    # Douyin's anti-bot filtering on unauthenticated requests.
+    try:
+        ff = FirefoxDouyinWebCrawler()
+        ff_cookies = ff._load_firefox_cookies(['.douyin.com', 'douyin.com', 'www.douyin.com'])
+        if ff_cookies.get('sessionid'):
+            crawler = ff
+    except Exception:
+        pass
     while has_more:
         if callable(should_stop) and should_stop():
             break
-        # Try base crawler first; if it fails (anti-bot empty body), fall back to Firefox cookies
         try:
             resp = await crawler.fetch_user_post_videos(sec_user_id=sec_user_id, max_cursor=max_cursor, count=35)
         except Exception:
             resp = None
         if not resp:
-            try:
-                alt = FirefoxDouyinWebCrawler()
-                resp = await alt.fetch_user_post_videos(sec_user_id=sec_user_id, max_cursor=max_cursor, count=35)
-            except Exception:
-                resp = None
-        if not resp:
             raise RuntimeError("Douyin returned an empty response for USER_POST. Cookie/msToken likely invalid or blocked.")
         aweme_list = (resp or {}).get('aweme_list')
         if not aweme_list:
-            # If we got a structured response but no list, treat as end-of-list.
             break
         for aweme in aweme_list:
             if callable(should_stop) and should_stop():
@@ -161,6 +162,13 @@ async def download_channel_new_items(
     (base_dir / 'landscape').mkdir(parents=True, exist_ok=True)
 
     crawler = DouyinWebCrawler()
+    try:
+        ff = FirefoxDouyinWebCrawler()
+        ff_cookies = ff._load_firefox_cookies(['.douyin.com', 'douyin.com', 'www.douyin.com'])
+        if ff_cookies.get('sessionid'):
+            crawler = ff
+    except Exception:
+        pass
     headers = await build_headers(crawler)
 
     sec = task.sec_user_id or await resolve_sec_user_id(crawler, task.url)

@@ -1,8 +1,9 @@
 """
 Preferences page for the Douyin application (minimal version).
-Contains one setting: Working Directory.
+Contains one setting: Working Directory, plus database status.
 """
 from pathlib import Path
+from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QMessageBox
@@ -33,6 +34,7 @@ class PreferencesPage(QWidget):
         main_layout.setSpacing(16)
 
         label_style = f"color: {self.theme.get_color('text', 'primary')};"
+        secondary_style = f"color: {self.theme.get_color('text', 'secondary')}; font-size: 12px;"
         input_style = f"""
             background-color: {self.theme.get_color('background', 'tertiary')};
             color: {self.theme.get_color('text', 'primary')};
@@ -87,13 +89,60 @@ class PreferencesPage(QWidget):
         db_row_layout.addWidget(create_btn, 0)
 
         main_layout.addWidget(db_row)
+
+        # Database status indicator
+        self.db_status_label = QLabel("")
+        self.db_status_label.setStyleSheet(secondary_style)
+        self.db_status_label.setWordWrap(True)
+        main_layout.addWidget(self.db_status_label)
+
         main_layout.addStretch(1)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._refresh_db_status()
+
+    def _get_working_dir(self) -> Path:
+        default_path = str(Path.home())
+        value = self.settings.get('preferences/working_dir', default_path, SettingType.PATH)
+        return Path(value) if value else Path(default_path)
+
+    def _refresh_db_status(self):
+        try:
+            working_dir = self._get_working_dir()
+            db_path = DatabaseManager.get_database_path(working_dir)
+            if db_path.exists():
+                size_kb = db_path.stat().st_size / 1024
+                modified = datetime.fromtimestamp(db_path.stat().st_mtime)
+                channel_count = len(DatabaseManager.list_channels(working_dir))
+                self.db_status_label.setText(
+                    f"Database found: {db_path.name}  |  "
+                    f"{size_kb:.0f} KB  |  "
+                    f"{channel_count} channel(s)  |  "
+                    f"Modified: {modified:%Y-%m-%d %H:%M}"
+                )
+                self.db_status_label.setStyleSheet(
+                    f"color: {self.theme.get_color('text', 'secondary')}; font-size: 12px;"
+                )
+            else:
+                self.db_status_label.setText(
+                    f"No database found at: {db_path}"
+                )
+                self.db_status_label.setStyleSheet(
+                    f"color: #e57373; font-size: 12px;"
+                )
+        except Exception as e:
+            self.db_status_label.setText(f"Database status error: {e}")
+            self.db_status_label.setStyleSheet(
+                f"color: #e57373; font-size: 12px;"
+            )
 
     def _load_settings(self):
         default_path = str(Path.home())
         value = self.settings.get('preferences/working_dir', default_path, SettingType.PATH)
         display = normalize_to_unc(value) if value else default_path
         self.working_dir_edit.setText(str(display))
+        self._refresh_db_status()
 
     def _browse_working_dir(self):
         current = self.settings.get('preferences/working_dir', str(Path.home()), SettingType.PATH)
@@ -108,17 +157,18 @@ class PreferencesPage(QWidget):
             self.working_dir_edit.setText(unc)
             self.settings.set('preferences/working_dir', Path(unc), SettingType.PATH)
             self.settings.sync()
+            self._refresh_db_status()
 
     def _create_database(self):
-        # Resolve working directory
-        working_dir = self.settings.get('preferences/working_dir', str(Path.home()), SettingType.PATH)
+        working_dir = self._get_working_dir()
         try:
-            db_path = DatabaseManager.init_database(Path(working_dir))
+            db_path = DatabaseManager.init_database(working_dir)
             QMessageBox.information(
                 self,
                 "Database",
                 f"Database initialized:\n{db_path}"
             )
+            self._refresh_db_status()
         except Exception as e:
             QMessageBox.critical(
                 self,
